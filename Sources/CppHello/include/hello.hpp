@@ -4,7 +4,7 @@
 namespace SNoteCpp {
 
 inline const char *defaultTitle() {
-    return "Welcome";
+    return "draft.txt";
 }
 
 } // namespace HelloCpp
