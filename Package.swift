@@ -14,7 +14,7 @@ let package = Package(
             publicHeadersPath: "include",
             cxxSettings: [
                 .headerSearchPath("include"),
-                .unsafeFlags(["-std=c++20"])
+                .unsafeFlags(["-std=c++23"])
             ],
             linkerSettings: [
                 .linkedFramework("CoreFoundation")

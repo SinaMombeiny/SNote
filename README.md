@@ -1,6 +1,6 @@
 # SNote
 
-A simple native macOS notes app built with SwiftUI and a C++20 application core.
+A simple native macOS notes app built with SwiftUI and a C++23 application core.
 
 ## Architecture
 
