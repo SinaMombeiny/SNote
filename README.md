@@ -33,7 +33,7 @@ swift build -c release
 ## macOS download
 
 Download `SNote-macOS.dmg` or `SNote-macOS.zip` from
-[GitHub Releases](https://github.com/SinaMombeiny/HelloCppSwift/releases).
+[GitHub Releases](https://github.com/SinaMombeiny/SNote/releases).
 
 Open the DMG and drag `SNote.app` to the Applications folder.
 If macOS says Apple could not verify the app, remove the downloaded app
