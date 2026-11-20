@@ -18,7 +18,7 @@ struct ContentView: View {
     @State private var documentText = ""
 
     var body: some View {
-        EditorView(title: $title, body: $documentText)
+        EditorView(title: $title, documentText: $documentText)
             .frame(minWidth: 700, minHeight: 480)
             .preferredColorScheme(.dark)
             .background(WindowAccessor())
@@ -42,7 +42,7 @@ struct ContentView: View {
 
 struct EditorView: View {
     @Binding var title: String
-    @Binding var body: String
+    @Binding var documentText: String
 
     private let ink = Color(red: 0.86, green: 0.86, blue: 0.84)
 
@@ -55,7 +55,7 @@ struct EditorView: View {
                     .textFieldStyle(.plain)
                     .padding(.bottom, 2)
 
-                TextEditor(text: $body)
+                TextEditor(text: $documentText)
                     .font(.custom("Menlo-Regular", size: 13))
                     .lineSpacing(4)
                     .foregroundStyle(ink)
