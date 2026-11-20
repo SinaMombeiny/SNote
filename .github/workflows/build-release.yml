@@ -28,16 +28,13 @@ jobs:
             exit 1
           fi
 
-          lipo -thin arm64 "$HELLO_BINARY" -output "$HELLO_BINARY.arm64"
-          mv "$HELLO_BINARY.arm64" "$HELLO_BINARY"
-          echo "HELLO_BINARY=$HELLO_BINARY" >> "$GITHUB_ENV"
-          lipo -archs "$HELLO_BINARY"
-
           ARCHS=$(lipo -archs "$HELLO_BINARY")
           if [[ "$ARCHS" != "arm64" ]]; then
             echo "::error::The application contains non-ARM64 architecture slices: $ARCHS"
             exit 1
           fi
+
+          echo "HELLO_BINARY=$HELLO_BINARY" >> "$GITHUB_ENV"
 
       - name: Package application
         env:
