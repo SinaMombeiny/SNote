@@ -23,7 +23,7 @@ let package = Package(
         .executableTarget(
             name: "SNote",
             dependencies: ["SNoteCore"],
-            path: "Sources/HelloApp",
+            path: "Sources/SNoteUI",
             swiftSettings: [
                 .interoperabilityMode(.Cxx)
             ]

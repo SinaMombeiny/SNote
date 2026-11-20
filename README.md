@@ -18,7 +18,7 @@ A simple native macOS notes app built with SwiftUI and a C++20 application core.
 Install Xcode on macOS, open Terminal, and run:
 
 ```sh
-cd /path/to/HelloCppSwift
+cd /path/to/SNote
 swift run
 ```
 

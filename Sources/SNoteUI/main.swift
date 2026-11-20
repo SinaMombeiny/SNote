@@ -3,7 +3,7 @@ import SNoteCore
 import AppKit
 
 @main
-struct HelloApp: App {
+struct SNoteApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
