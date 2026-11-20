@@ -2,6 +2,8 @@
 
 A simple native macOS notes app built with SwiftUI and C++.
 
+<img width="971" height="639" alt="SNote" src="https://github.com/user-attachments/assets/4d0833d8-4703-490b-a8b0-d93ae0afca11" />
+
 ## Run
 
 Install Xcode on macOS, open Terminal, and run:
