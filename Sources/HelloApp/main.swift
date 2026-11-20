@@ -15,10 +15,10 @@ struct HelloApp: App {
 
 struct ContentView: View {
     @State private var title = ""
-    @State private var body = ""
+    @State private var documentText = ""
 
     var body: some View {
-        EditorView(title: $title, body: $body)
+        EditorView(title: $title, body: $documentText)
             .frame(minWidth: 700, minHeight: 480)
             .preferredColorScheme(.dark)
             .background(WindowAccessor())
@@ -28,13 +28,13 @@ struct ContentView: View {
                     title = String(cString: titlePointer)
                 }
                 if let bodyPointer = SNoteCore.body() {
-                    body = String(cString: bodyPointer)
+                    documentText = String(cString: bodyPointer)
                 }
             }
-            .onChange(of: title) { _, newValue in
+            .onChange(of: title) { newValue in
                 SNoteCore.setTitle(newValue)
             }
-            .onChange(of: body) { _, newValue in
+            .onChange(of: documentText) { newValue in
                 SNoteCore.setBody(newValue)
             }
     }
