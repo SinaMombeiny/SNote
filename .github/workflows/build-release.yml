@@ -150,12 +150,20 @@ jobs:
           TAG: ${{ steps.release.outputs.tag }}
         run: |
           set -euo pipefail
-          gh release create "$TAG" \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "SNote $TAG" \
-            --notes "Native Apple silicon notes app built with SwiftUI and C++. Download the ZIP or DMG, then open the app." \
-            dist/SNote-macOS.zip \
-            dist/SNote-macOS.dmg
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --clobber \
+              dist/SNote-macOS.zip \
+              dist/SNote-macOS.dmg
+          else
+            gh release create "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "SNote $TAG" \
+              --notes "Native Apple silicon notes app built with SwiftUI and C++. Download the ZIP or DMG, then open the app." \
+              dist/SNote-macOS.zip \
+              dist/SNote-macOS.dmg
+          fi
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
