@@ -53,24 +53,14 @@ final class NoteStore: ObservableObject {
             UserDefaults.standard.set(data, forKey: storageKey)
         }
     }
-
-    func addNote() {
-        let note = Note(title: "New Note", modifiedAt: Date())
-        notes.insert(note, at: 0)
-    }
-
-    func delete(_ note: Note) {
-        notes.removeAll { $0.id == note.id }
-    }
 }
 
 struct ContentView: View {
     @ObservedObject var store: NoteStore
-    @State private var selection: Note.ID?
 
-    var body: some View {
-        EditorView(note: Binding(
-            get: { store.notes.first ?? Note(title: "draft.txt") },
+    private var note: Binding<Note> {
+        Binding(
+            get: { store.notes.first ?? Note(title: "Untitled") },
             set: { updated in
                 if store.notes.isEmpty {
                     store.notes = [updated]
@@ -79,27 +69,46 @@ struct ContentView: View {
                     store.notes[0].modifiedAt = Date()
                 }
             }
-        ))
-        .frame(minWidth: 760, minHeight: 500)
-        .preferredColorScheme(.dark)
-        .background(WindowAccessor())
+        )
+    }
+
+    var body: some View {
+        EditorView(note: note)
+            .frame(minWidth: 700, minHeight: 480)
+            .preferredColorScheme(.dark)
+            .background(WindowAccessor())
     }
 }
 
 struct EditorView: View {
     @Binding var note: Note
 
+    private let ink = Color(red: 0.86, green: 0.86, blue: 0.84)
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            TextEditor(text: $note.body)
-                .font(.custom("SFMono-Regular", size: 13))
-                .foregroundStyle(Color(red: 0.80, green: 0.84, blue: 0.88))
-                .scrollContentBackground(.hidden)
-                .padding(.horizontal, 40)
-                .padding(.vertical, 34)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        GeometryReader { geometry in
+            VStack(alignment: .leading, spacing: 8) {
+                TextField("Untitled", text: $note.title)
+                    .font(.custom("Menlo-Bold", size: 16))
+                    .foregroundStyle(ink)
+                    .textFieldStyle(.plain)
+                    .padding(.bottom, 2)
+
+                TextEditor(text: $note.body)
+                    .font(.custom("Menlo-Regular", size: 13))
+                    .lineSpacing(4)
+                    .foregroundStyle(ink)
+                    .scrollContentBackground(.hidden)
+                    .padding(.horizontal, -5)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .accessibilityLabel("Document text")
+            }
+            .frame(width: min(geometry.size.width - 100, 760), height: geometry.size.height - 100, alignment: .topLeading)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .padding(.top, 52)
+            .background(Color(red: 0.035, green: 0.04, blue: 0.055))
         }
-        .background(Color.black)
+        .background(Color(red: 0.035, green: 0.04, blue: 0.055))
     }
 }
 
@@ -112,7 +121,7 @@ private struct WindowAccessor: NSViewRepresentable {
             window.titleVisibility = .hidden
             window.titlebarAppearsTransparent = true
             window.styleMask.insert(.fullSizeContentView)
-            window.backgroundColor = .black
+            window.backgroundColor = NSColor(red: 0.035, green: 0.04, blue: 0.055, alpha: 1)
             window.isOpaque = true
         }
 
