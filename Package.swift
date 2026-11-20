@@ -16,7 +16,10 @@ let package = Package(
         .executableTarget(
             name: "HelloApp",
             dependencies: ["CppHello"],
-            path: "Sources/HelloApp"
+            path: "Sources/HelloApp",
+            swiftSettings: [
+                .interoperabilityMode(.Cxx)
+            ]
         )
     ]
 )
