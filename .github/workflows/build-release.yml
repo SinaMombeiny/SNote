@@ -47,12 +47,12 @@ jobs:
         run: |
           set -euo pipefail
 
-          APP_DIR="dist/HelloCppSwift.app"
+          APP_DIR="dist/SNote.app"
           CONTENTS="$APP_DIR/Contents"
           mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
 
-          cp "$HELLO_BINARY" "$CONTENTS/MacOS/HelloCppSwift"
-          if [[ "$(lipo -archs "$CONTENTS/MacOS/HelloCppSwift")" != "arm64" ]]; then
+          cp "$HELLO_BINARY" "$CONTENTS/MacOS/SNote"
+          if [[ "$(lipo -archs "$CONTENTS/MacOS/SNote")" != "arm64" ]]; then
             echo "::error::The packaged app is not ARM64-only."
             exit 1
           fi
@@ -63,13 +63,13 @@ jobs:
           <plist version="1.0">
           <dict>
               <key>CFBundleName</key>
-              <string>HelloCppSwift</string>
+              <string>SNote</string>
               <key>CFBundleDisplayName</key>
-              <string>HelloCppSwift</string>
+              <string>SNote</string>
               <key>CFBundleIdentifier</key>
-              <string>com.sinamombeiny.hellocppswift</string>
+              <string>com.sinamombeiny.snote</string>
               <key>CFBundleExecutable</key>
-              <string>HelloCppSwift</string>
+              <string>SNote</string>
               <key>CFBundlePackageType</key>
               <string>APPL</string>
               <key>CFBundleShortVersionString</key>
@@ -118,21 +118,21 @@ jobs:
                 -n "${NOTARIZATION_PASSWORD:-}" && \
                 -n "${NOTARIZATION_TEAM_ID:-}" && \
                 -n "${BUILD_CERTIFICATE_BASE64:-}" ]]; then
-            xcrun notarytool store-credentials "HelloCppSwift-notary" \
+            xcrun notarytool store-credentials "SNote-notary" \
               --apple-id "$NOTARIZATION_APPLE_ID" \
               --password "$NOTARIZATION_PASSWORD" \
               --team-id "$NOTARIZATION_TEAM_ID"
 
-            ditto -c -k --sequesterRsrc --keepParent "$APP_DIR" "dist/HelloCppSwift-notarization.zip"
-            xcrun notarytool submit "dist/HelloCppSwift-notarization.zip" \
-              --keychain-profile "HelloCppSwift-notary" \
+            ditto -c -k --sequesterRsrc --keepParent "$APP_DIR" "dist/SNote-notarization.zip"
+            xcrun notarytool submit "dist/SNote-notarization.zip" \
+              --keychain-profile "SNote-notary" \
               --wait
             xcrun stapler staple "$APP_DIR"
-            rm "dist/HelloCppSwift-notarization.zip"
+            rm "dist/SNote-notarization.zip"
           fi
 
-          ditto -c -k --sequesterRsrc --keepParent "$APP_DIR" "dist/HelloCppSwift-macOS.zip"
-          hdiutil create -volname "HelloCppSwift" -srcfolder "$APP_DIR" -ov -format UDZO "dist/HelloCppSwift-macOS.dmg"
+          ditto -c -k --sequesterRsrc --keepParent "$APP_DIR" "dist/SNote-macOS.zip"
+          hdiutil create -volname "SNote" -srcfolder "$APP_DIR" -ov -format UDZO "dist/SNote-macOS.dmg"
 
       - name: Set release tag
         id: release
@@ -152,13 +152,13 @@ jobs:
           set -euo pipefail
           gh release create "$TAG" \
             --repo "$GITHUB_REPOSITORY" \
-            --title "HelloCppSwift $TAG" \
-            --notes "macOS app built with SwiftUI and C++. Download the ZIP or DMG, then open the app." \
-            dist/HelloCppSwift-macOS.zip \
-            dist/HelloCppSwift-macOS.dmg
+            --title "SNote $TAG" \
+            --notes "Native Apple silicon notes app built with SwiftUI and C++. Download the ZIP or DMG, then open the app." \
+            dist/SNote-macOS.zip \
+            dist/SNote-macOS.dmg
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: HelloCppSwift-macOS
+          name: SNote-macOS
           path: dist/

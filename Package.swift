@@ -3,7 +3,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "HelloCppSwift",
+    name: "SNote",
     platforms: [
         .macOS(.v13)
     ],

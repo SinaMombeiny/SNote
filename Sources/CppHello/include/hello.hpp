@@ -1,10 +1,10 @@
 #ifndef HELLO_HPP
 #define HELLO_HPP
 
-namespace HelloCpp {
+namespace SNoteCpp {
 
-inline const char *message() {
-    return "Hello, world!";
+inline const char *defaultTitle() {
+    return "Welcome";
 }
 
 } // namespace HelloCpp
