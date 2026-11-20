@@ -21,6 +21,13 @@ jobs:
         run: swift build -c release
 
       - name: Package application
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          NOTARIZATION_APPLE_ID: ${{ secrets.NOTARIZATION_APPLE_ID }}
+          NOTARIZATION_PASSWORD: ${{ secrets.NOTARIZATION_PASSWORD }}
+          NOTARIZATION_TEAM_ID: ${{ secrets.NOTARIZATION_TEAM_ID }}
         run: |
           set -euo pipefail
 
@@ -58,7 +65,51 @@ jobs:
           PLIST
 
           /usr/libexec/PlistBuddy -c "Print :CFBundleName" "$CONTENTS/Info.plist" >/dev/null
-          codesign --force --deep --sign - "$APP_DIR"
+
+          if [[ -n "${BUILD_CERTIFICATE_BASE64:-}" ]]; then
+            echo "$BUILD_CERTIFICATE_BASE64" | base64 --decode > certificate.p12
+
+            security create-keychain -p "${KEYCHAIN_PASSWORD:-temporary}" build.keychain
+            security default-keychain -s build.keychain
+            security unlock-keychain -p "${KEYCHAIN_PASSWORD:-temporary}" build.keychain
+            security import certificate.p12 \
+              -k build.keychain \
+              -P "${P12_PASSWORD:-}" \
+              -T /usr/bin/codesign \
+              -T /usr/bin/security
+            security set-key-partition-list \
+              -S apple-tool:,apple:,codesign: \
+              -s -k "${KEYCHAIN_PASSWORD:-temporary}" build.keychain
+
+            SIGNING_IDENTITY=$(security find-identity -v -p codesigning build.keychain \
+              | awk '/Developer ID Application/{print $2; exit}')
+            if [[ -z "$SIGNING_IDENTITY" ]]; then
+              echo "::error::The certificate is not a Developer ID Application certificate."
+              exit 1
+            fi
+
+            codesign --force --deep --timestamp --options runtime \
+              --sign "$SIGNING_IDENTITY" "$APP_DIR"
+          else
+            codesign --force --deep --sign - "$APP_DIR"
+          fi
+
+          if [[ -n "${NOTARIZATION_APPLE_ID:-}" && \
+                -n "${NOTARIZATION_PASSWORD:-}" && \
+                -n "${NOTARIZATION_TEAM_ID:-}" && \
+                -n "${BUILD_CERTIFICATE_BASE64:-}" ]]; then
+            xcrun notarytool store-credentials "HelloCppSwift-notary" \
+              --apple-id "$NOTARIZATION_APPLE_ID" \
+              --password "$NOTARIZATION_PASSWORD" \
+              --team-id "$NOTARIZATION_TEAM_ID"
+
+            ditto -c -k --sequesterRsrc --keepParent "$APP_DIR" "dist/HelloCppSwift-notarization.zip"
+            xcrun notarytool submit "dist/HelloCppSwift-notarization.zip" \
+              --keychain-profile "HelloCppSwift-notary" \
+              --wait
+            xcrun stapler staple "$APP_DIR"
+            rm "dist/HelloCppSwift-notarization.zip"
+          fi
 
           ditto -c -k --sequesterRsrc --keepParent "$APP_DIR" "dist/HelloCppSwift-macOS.zip"
           hdiutil create -volname "HelloCppSwift" -srcfolder "$APP_DIR" -ov -format UDZO "dist/HelloCppSwift-macOS.dmg"

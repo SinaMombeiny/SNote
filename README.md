@@ -25,6 +25,16 @@ Download `HelloCppSwift-macOS.dmg` or `HelloCppSwift-macOS.zip` from
 [GitHub Releases](https://github.com/SinaMombeiny/HelloCppSwift/releases).
 
 Open the DMG and drag `HelloCppSwift.app` to the Applications folder.
-The app is ad-hoc signed for this repository, so macOS Gatekeeper may
-display a warning on first launch. Control-click the app, choose **Open**, then
-choose **Open** again in the confirmation dialog.
+If macOS says Apple could not verify the app, remove the downloaded app
+quarantine flag, then open it:
+
+```sh
+xattr -cr /Applications/HelloCppSwift.app
+open /Applications/HelloCppSwift.app
+```
+
+For a warning-free download, this repository supports Apple Developer
+ID signing and notarization. Configure these GitHub Actions secrets:
+`BUILD_CERTIFICATE_BASE64`, `P12_PASSWORD`, `KEYCHAIN_PASSWORD`,
+`NOTARIZATION_APPLE_ID`, `NOTARIZATION_PASSWORD`, and
+`NOTARIZATION_TEAM_ID`.
