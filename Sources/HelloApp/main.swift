@@ -1,100 +1,61 @@
 import SwiftUI
-import CppHello
+import SNoteCore
 import AppKit
 
 @main
 struct HelloApp: App {
-    @StateObject private var store = NoteStore()
-
     var body: some Scene {
         WindowGroup {
-            ContentView(store: store)
+            ContentView()
         }
         .windowStyle(.hiddenTitleBar)
         .windowToolbarStyle(.unifiedCompact(showsTitle: false))
     }
 }
 
-struct Note: Identifiable, Codable, Equatable {
-    let id: UUID
-    var title: String
-    var body: String
-    var modifiedAt: Date
-
-    init(id: UUID = UUID(), title: String = "", body: String = "", modifiedAt: Date = Date()) {
-        self.id = id
-        self.title = title
-        self.body = body
-        self.modifiedAt = modifiedAt
-    }
-}
-
-@MainActor
-final class NoteStore: ObservableObject {
-    @Published var notes: [Note] {
-        didSet { save() }
-    }
-
-    private let storageKey = "SNote.notes"
-
-    init() {
-        if let data = UserDefaults.standard.data(forKey: storageKey),
-           let saved = try? JSONDecoder().decode([Note].self, from: data) {
-            notes = saved
-        } else {
-            let cppTitle = SNoteCpp.defaultTitle()
-            let title = cppTitle.map { String(cString: $0) } ?? "draft.txt"
-            notes = [Note(title: title, body: "")]
-        }
-    }
-
-    func save() {
-        if let data = try? JSONEncoder().encode(notes) {
-            UserDefaults.standard.set(data, forKey: storageKey)
-        }
-    }
-}
-
 struct ContentView: View {
-    @ObservedObject var store: NoteStore
-
-    private var note: Binding<Note> {
-        Binding(
-            get: { store.notes.first ?? Note(title: "Untitled") },
-            set: { updated in
-                if store.notes.isEmpty {
-                    store.notes = [updated]
-                } else {
-                    store.notes[0] = updated
-                    store.notes[0].modifiedAt = Date()
-                }
-            }
-        )
-    }
+    @State private var title = ""
+    @State private var body = ""
 
     var body: some View {
-        EditorView(note: note)
+        EditorView(title: $title, body: $body)
             .frame(minWidth: 700, minHeight: 480)
             .preferredColorScheme(.dark)
             .background(WindowAccessor())
+            .onAppear {
+                SNoteCore.initialize()
+                if let titlePointer = SNoteCore.title() {
+                    title = String(cString: titlePointer)
+                }
+                if let bodyPointer = SNoteCore.body() {
+                    body = String(cString: bodyPointer)
+                }
+            }
+            .onChange(of: title) { _, newValue in
+                SNoteCore.setTitle(newValue)
+            }
+            .onChange(of: body) { _, newValue in
+                SNoteCore.setBody(newValue)
+            }
     }
 }
 
 struct EditorView: View {
-    @Binding var note: Note
+    @Binding var title: String
+    @Binding var body: String
 
     private let ink = Color(red: 0.86, green: 0.86, blue: 0.84)
 
     var body: some View {
         GeometryReader { geometry in
             VStack(alignment: .leading, spacing: 8) {
-                TextField("Untitled", text: $note.title)
+                TextField("Untitled", text: $title)
                     .font(.custom("Menlo-Bold", size: 16))
                     .foregroundStyle(ink)
                     .textFieldStyle(.plain)
                     .padding(.bottom, 2)
 
-                TextEditor(text: $note.body)
+                TextEditor(text: $body)
                     .font(.custom("Menlo-Regular", size: 13))
                     .lineSpacing(4)
                     .foregroundStyle(ink)

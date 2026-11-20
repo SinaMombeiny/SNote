@@ -9,13 +9,20 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "CppHello",
-            path: "Sources/CppHello",
-            publicHeadersPath: "include"
+            name: "SNoteCore",
+            path: "Sources/SNoteCore",
+            publicHeadersPath: "include",
+            cxxSettings: [
+                .headerSearchPath("include"),
+                .unsafeFlags(["-std=c++20"])
+            ],
+            linkerSettings: [
+                .linkedFramework("CoreFoundation")
+            ]
         ),
         .executableTarget(
-            name: "HelloApp",
-            dependencies: ["CppHello"],
+            name: "SNote",
+            dependencies: ["SNoteCore"],
             path: "Sources/HelloApp",
             swiftSettings: [
                 .interoperabilityMode(.Cxx)

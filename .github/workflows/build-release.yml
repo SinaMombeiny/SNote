@@ -22,19 +22,19 @@ jobs:
           set -euo pipefail
           swift build -c release --arch arm64
 
-          HELLO_BINARY=$(find .build -type f -path "*release*/HelloApp" -perm -111 | head -n 1)
-          if [[ -z "$HELLO_BINARY" ]]; then
-            echo "::error::Could not find the ARM64 HelloApp executable."
+          SNOTE_BINARY=$(find .build -type f -path "*release*/SNote" -perm -111 | head -n 1)
+          if [[ -z "$SNOTE_BINARY" ]]; then
+            echo "::error::Could not find the ARM64 SNote executable."
             exit 1
           fi
 
-          ARCHS=$(lipo -archs "$HELLO_BINARY")
+          ARCHS=$(lipo -archs "$SNOTE_BINARY")
           if [[ "$ARCHS" != "arm64" ]]; then
             echo "::error::The application contains non-ARM64 architecture slices: $ARCHS"
             exit 1
           fi
 
-          echo "HELLO_BINARY=$HELLO_BINARY" >> "$GITHUB_ENV"
+          echo "SNOTE_BINARY=$SNOTE_BINARY" >> "$GITHUB_ENV"
 
       - name: Package application
         env:
@@ -51,7 +51,7 @@ jobs:
           CONTENTS="$APP_DIR/Contents"
           mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
 
-          cp "$HELLO_BINARY" "$CONTENTS/MacOS/SNote"
+          cp "$SNOTE_BINARY" "$CONTENTS/MacOS/SNote"
           if [[ "$(lipo -archs "$CONTENTS/MacOS/SNote")" != "arm64" ]]; then
             echo "::error::The packaged app is not ARM64-only."
             exit 1
