@@ -18,7 +18,26 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build
-        run: swift build -c release
+        run: |
+          set -euo pipefail
+          swift build -c release --arch arm64
+
+          HELLO_BINARY=$(find .build -type f -path "*release*/HelloApp" -perm -111 | head -n 1)
+          if [[ -z "$HELLO_BINARY" ]]; then
+            echo "::error::Could not find the ARM64 HelloApp executable."
+            exit 1
+          fi
+
+          lipo -thin arm64 "$HELLO_BINARY" -output "$HELLO_BINARY.arm64"
+          mv "$HELLO_BINARY.arm64" "$HELLO_BINARY"
+          echo "HELLO_BINARY=$HELLO_BINARY" >> "$GITHUB_ENV"
+          lipo -archs "$HELLO_BINARY"
+
+          ARCHS=$(lipo -archs "$HELLO_BINARY")
+          if [[ "$ARCHS" != "arm64" ]]; then
+            echo "::error::The application contains non-ARM64 architecture slices: $ARCHS"
+            exit 1
+          fi
 
       - name: Package application
         env:
@@ -35,7 +54,11 @@ jobs:
           CONTENTS="$APP_DIR/Contents"
           mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
 
-          cp ".build/release/HelloApp" "$CONTENTS/MacOS/HelloCppSwift"
+          cp "$HELLO_BINARY" "$CONTENTS/MacOS/HelloCppSwift"
+          if [[ "$(lipo -archs "$CONTENTS/MacOS/HelloCppSwift")" != "arm64" ]]; then
+            echo "::error::The packaged app is not ARM64-only."
+            exit 1
+          fi
 
           cat > "$CONTENTS/Info.plist" <<'PLIST'
           <?xml version="1.0" encoding="UTF-8"?>
