@@ -15,8 +15,10 @@ struct HelloApp: App {
 
 struct ContentView: View {
     private var message: String {
-        let cppMessage = HelloCpp.message()
-        return String(cString: cppMessage)
+        if let cppMessage = HelloCpp.message() {
+            return String(cString: cppMessage)
+        }
+        return "Hello, world!"
     }
 
     var body: some View {
