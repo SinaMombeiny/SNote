@@ -1,5 +1,6 @@
 import SwiftUI
 import CppHello
+import AppKit
 
 @main
 struct HelloApp: App {
@@ -7,6 +8,8 @@ struct HelloApp: App {
         WindowGroup {
             ContentView()
         }
+        .windowStyle(.hiddenTitleBar)
+        .windowToolbarStyle(.unifiedCompact(showsTitle: false))
     }
 }
 
@@ -19,9 +22,33 @@ struct ContentView: View {
     }
 
     var body: some View {
-        Text(message)
-            .font(.largeTitle)
-            .padding(40)
-            .frame(minWidth: 360, minHeight: 180)
+        ZStack {
+            Color.black
+                .ignoresSafeArea()
+
+            Text(message)
+                .foregroundStyle(.white)
+                .font(.largeTitle)
+        }
+        .frame(minWidth: 360, minHeight: 180)
+        .preferredColorScheme(.dark)
+        .background(WindowAccessor())
     }
+}
+
+private struct WindowAccessor: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+
+        DispatchQueue.main.async {
+            guard let window = view.window else { return }
+            window.titleVisibility = .hidden
+            window.titlebarAppearsTransparent = true
+            window.styleMask.insert(.fullSizeContentView)
+        }
+
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
 }
