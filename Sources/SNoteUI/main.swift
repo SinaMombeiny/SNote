@@ -70,13 +70,13 @@ struct EditorView: View {
         GeometryReader { geometry in
             VStack(alignment: .leading, spacing: 8) {
                 TextField("Untitled", text: $title)
-                    .font(.custom("Menlo-Bold", size: 16))
+                    .font(.custom("Menlo-Bold", size: 18))
                     .foregroundStyle(ink)
                     .textFieldStyle(.plain)
                     .padding(.bottom, 2)
 
                 TextEditor(text: $documentText)
-                    .font(.custom("Menlo-Regular", size: 13))
+                    .font(.custom("Menlo-Regular", size: 15))
                     .lineSpacing(4)
                     .foregroundStyle(ink)
                     .scrollContentBackground(.hidden)
@@ -87,9 +87,9 @@ struct EditorView: View {
             .frame(width: min(geometry.size.width - 100, 760), height: geometry.size.height - 100, alignment: .topLeading)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .padding(.top, 52)
-            .background(Color(red: 0.035, green: 0.04, blue: 0.055))
+            .background(Color.black)
         }
-        .background(Color(red: 0.035, green: 0.04, blue: 0.055))
+        .background(Color.black)
     }
 }
 
@@ -102,7 +102,7 @@ private struct WindowAccessor: NSViewRepresentable {
             window.titleVisibility = .hidden
             window.titlebarAppearsTransparent = true
             window.styleMask.insert(.fullSizeContentView)
-            window.backgroundColor = NSColor(red: 0.035, green: 0.04, blue: 0.055, alpha: 1)
+            window.backgroundColor = NSColor.black
             window.isOpaque = true
         }
 
