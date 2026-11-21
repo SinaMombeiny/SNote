@@ -195,19 +195,6 @@ bool loadLegacyPreference() {
     return loaded;
 }
 
-void writeLegacyPreference() {
-    std::string legacy = "[{\"title\":\"" + jsonEscape(document.title) +
-        "\",\"body\":\"" + jsonEscape(document.body) + "\",\"modifiedAt\":0}]";
-    CFDataRef data = CFDataCreate(
-        kCFAllocatorDefault,
-        reinterpret_cast<const UInt8 *>(legacy.data()),
-        static_cast<CFIndex>(legacy.size()));
-    CFPreferencesSetAppValue(
-        CFSTR("SNote.notes"), data, kCFPreferencesCurrentApplication);
-    CFPreferencesAppSynchronize(kCFPreferencesCurrentApplication);
-    CFRelease(data);
-}
-
 void saveDocumentLocked() {
     std::error_code error;
     std::filesystem::create_directories(storageDirectory(), error);
@@ -223,7 +210,6 @@ void saveDocumentLocked() {
                << "\",\"body\":\"" << jsonEscape(document.body)
                << "\",\"modifiedAt\":" << seconds << '}';
     }
-    writeLegacyPreference();
 }
 
 }
@@ -250,25 +236,27 @@ void initialize() {
 }
 
 const char *title() {
+    thread_local std::string snapshot;
     std::lock_guard<std::mutex> lock(documentMutex);
-    return document.title.c_str();
+    snapshot = document.title;
+    return snapshot.c_str();
 }
 
 const char *body() {
+    thread_local std::string snapshot;
     std::lock_guard<std::mutex> lock(documentMutex);
-    return document.body.c_str();
+    snapshot = document.body;
+    return snapshot.c_str();
 }
 
 void setTitle(const char *value) {
     std::lock_guard<std::mutex> lock(documentMutex);
     document.title = value == nullptr ? "" : value;
-    saveDocumentLocked();
 }
 
 void setBody(const char *value) {
     std::lock_guard<std::mutex> lock(documentMutex);
     document.body = value == nullptr ? "" : value;
-    saveDocumentLocked();
 }
 
 void save() {

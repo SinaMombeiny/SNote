@@ -6,8 +6,8 @@
 namespace SNoteCore {
 
 void initialize();
-std::string title();
-std::string body();
+const char *title();
+const char *body();
 void setTitle(const char *value);
 void setBody(const char *value);
 void save();

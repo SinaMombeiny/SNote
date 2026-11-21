@@ -16,6 +16,7 @@ struct SNoteApp: App {
 struct ContentView: View {
     @State private var title = ""
     @State private var documentText = ""
+    @State private var pendingSave: Task<Void, Never>?
 
     var body: some View {
         EditorView(title: $title, documentText: $documentText)
@@ -33,10 +34,29 @@ struct ContentView: View {
             }
             .onChange(of: title) { newValue in
                 SNoteCore.setTitle(newValue)
+                scheduleSave()
             }
             .onChange(of: documentText) { newValue in
                 SNoteCore.setBody(newValue)
+                scheduleSave()
             }
+            .onDisappear {
+                pendingSave?.cancel()
+                SNoteCore.save()
+            }
+    }
+
+    private func scheduleSave() {
+        pendingSave?.cancel()
+        pendingSave = Task {
+            do {
+                try await Task.sleep(nanoseconds: 500_000_000)
+            } catch {
+                return
+            }
+            guard !Task.isCancelled else { return }
+            SNoteCore.save()
+        }
     }
 }
 
