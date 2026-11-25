@@ -1,4 +1,4 @@
-name: Build macOS App
+name: Build macOS PKG Release
 
 on:
   push:
@@ -10,13 +10,14 @@ permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-\${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   build-macos:
-    # GitHub's macos-26 standard runner is Apple silicon (arm64).
+    # macos-26 standard runners use Apple silicon (arm64).
     runs-on: macos-26
+    timeout-minutes: 30
     permissions:
       contents: write
 
@@ -32,15 +33,15 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            TAG="${GITHUB_REF_NAME}"
-            VERSION="${TAG#v}"
+          if [[ "\${GITHUB_REF_TYPE}" == "tag" ]]; then
+            TAG="\${GITHUB_REF_NAME}"
+            VERSION="\${TAG#v}"
             if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
               echo "::error::Release tags must use the format vMAJOR.MINOR.PATCH."
               exit 1
             fi
           else
-            VERSION="1.0.${GITHUB_RUN_NUMBER}"
+            VERSION="1.0.\${GITHUB_RUN_NUMBER}"
             TAG="v$VERSION"
           fi
 
@@ -52,7 +53,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          swift build -c release --arch arm64
+          # Two compiler jobs keep peak memory low on the 7 GB standard Apple silicon runner.
+          swift build -c release --arch arm64 --jobs 2
           BIN_DIR="$(swift build --show-bin-path -c release --arch arm64)"
           SNOTE_BINARY="$BIN_DIR/SNote"
 
@@ -69,22 +71,26 @@ jobs:
 
           echo "SNOTE_BINARY=$SNOTE_BINARY" >> "$GITHUB_ENV"
 
-      - name: Package, sign, and notarize application
+      - name: Package, sign, and notarize installer
         env:
-          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
-          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
-          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
-          NOTARIZATION_APPLE_ID: ${{ secrets.NOTARIZATION_APPLE_ID }}
-          NOTARIZATION_PASSWORD: ${{ secrets.NOTARIZATION_PASSWORD }}
-          NOTARIZATION_TEAM_ID: ${{ secrets.NOTARIZATION_TEAM_ID }}
-          VERSION: ${{ steps.release.outputs.version }}
+          BUILD_CERTIFICATE_BASE64: \${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          INSTALLER_CERTIFICATE_BASE64: \${{ secrets.INSTALLER_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: \${{ secrets.P12_PASSWORD }}
+          INSTALLER_P12_PASSWORD: \${{ secrets.INSTALLER_P12_PASSWORD }}
+          KEYCHAIN_PASSWORD: \${{ secrets.KEYCHAIN_PASSWORD }}
+          NOTARIZATION_APPLE_ID: \${{ secrets.NOTARIZATION_APPLE_ID }}
+          NOTARIZATION_PASSWORD: \${{ secrets.NOTARIZATION_PASSWORD }}
+          NOTARIZATION_TEAM_ID: \${{ secrets.NOTARIZATION_TEAM_ID }}
+          VERSION: \${{ steps.release.outputs.version }}
         shell: bash
         run: |
           set -euo pipefail
 
           APP_DIR="dist/SNote.app"
           CONTENTS="$APP_DIR/Contents"
-          mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources" dist
+          BUNDLE_ID="com.sinamombeiny.snote"
+          PKG_PATH="dist/SNote-macOS.pkg"
+          mkdir -p "$CONTENTS/MacOS" dist
           cp "$SNOTE_BINARY" "$CONTENTS/MacOS/SNote"
 
           ARCHS="$(lipo -archs "$CONTENTS/MacOS/SNote")"
@@ -126,98 +132,130 @@ jobs:
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" "$CONTENTS/Info.plist"
           /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$CONTENTS/Info.plist" >/dev/null
 
-          if [[ -n "${BUILD_CERTIFICATE_BASE64:-}" ]]; then
-            for secret_name in P12_PASSWORD KEYCHAIN_PASSWORD NOTARIZATION_APPLE_ID NOTARIZATION_PASSWORD NOTARIZATION_TEAM_ID; do
-              if [[ -z "${!secret_name:-}" ]]; then
-                echo "::error::Set $secret_name when using Developer ID signing."
+          SIGNING_CONFIGURED=false
+          for secret_name in BUILD_CERTIFICATE_BASE64 INSTALLER_CERTIFICATE_BASE64 P12_PASSWORD INSTALLER_P12_PASSWORD KEYCHAIN_PASSWORD NOTARIZATION_APPLE_ID NOTARIZATION_PASSWORD NOTARIZATION_TEAM_ID; do
+            if [[ -n "\${!secret_name:-}" ]]; then
+              SIGNING_CONFIGURED=true
+              break
+            fi
+          done
+
+          if [[ "$SIGNING_CONFIGURED" == "true" ]]; then
+            for secret_name in BUILD_CERTIFICATE_BASE64 INSTALLER_CERTIFICATE_BASE64 P12_PASSWORD INSTALLER_P12_PASSWORD KEYCHAIN_PASSWORD NOTARIZATION_APPLE_ID NOTARIZATION_PASSWORD NOTARIZATION_TEAM_ID; do
+              if [[ -z "\${!secret_name:-}" ]]; then
+                echo "::error::Set $secret_name. Signed and notarized PKG releases require both Developer ID Application and Developer ID Installer certificates plus the notarization secrets."
                 exit 1
               fi
             done
 
             KEYCHAIN_PATH="$RUNNER_TEMP/snote-build.keychain-db"
-            CERTIFICATE_PATH="$RUNNER_TEMP/snote-certificate.p12"
+            APP_CERTIFICATE_PATH="$RUNNER_TEMP/snote-app-certificate.p12"
+            INSTALLER_CERTIFICATE_PATH="$RUNNER_TEMP/snote-installer-certificate.p12"
             ORIGINAL_KEYCHAIN="$(security default-keychain -d user | tr -d '"')"
             cleanup() {
               security default-keychain -d user -s "$ORIGINAL_KEYCHAIN" || true
               security delete-keychain "$KEYCHAIN_PATH" >/dev/null 2>&1 || true
-              rm -f "$CERTIFICATE_PATH"
+              rm -f "$APP_CERTIFICATE_PATH" "$INSTALLER_CERTIFICATE_PATH"
             }
             trap cleanup EXIT
 
-            echo "$BUILD_CERTIFICATE_BASE64" | base64 -D > "$CERTIFICATE_PATH"
+            echo "$BUILD_CERTIFICATE_BASE64" | base64 -D > "$APP_CERTIFICATE_PATH"
+            echo "$INSTALLER_CERTIFICATE_BASE64" | base64 -D > "$INSTALLER_CERTIFICATE_PATH"
             security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
             security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
             security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-            security import "$CERTIFICATE_PATH" \
+            security import "$APP_CERTIFICATE_PATH" \
               -k "$KEYCHAIN_PATH" \
               -P "$P12_PASSWORD" \
               -T /usr/bin/codesign
+            security import "$INSTALLER_CERTIFICATE_PATH" \
+              -k "$KEYCHAIN_PATH" \
+              -P "$INSTALLER_P12_PASSWORD" \
+              -T /usr/bin/pkgbuild
             security default-keychain -d user -s "$KEYCHAIN_PATH"
             security set-key-partition-list \
-              -S apple-tool:,apple:,codesign: \
+              -S apple-tool:,apple:,codesign:,productbuild: \
               -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
-            SIGNING_IDENTITY="$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" \
+            APP_SIGNING_IDENTITY="$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" \
               | awk '/Developer ID Application/{print $2; exit}')"
-            if [[ -z "$SIGNING_IDENTITY" ]]; then
-              echo "::error::The certificate must be a Developer ID Application certificate."
+            INSTALLER_SIGNING_IDENTITY="$(security find-identity -v "$KEYCHAIN_PATH" \
+              | awk '/Developer ID Installer/{print $2; exit}')"
+            if [[ -z "$APP_SIGNING_IDENTITY" || -z "$INSTALLER_SIGNING_IDENTITY" ]]; then
+              echo "::error::The certificates must be Developer ID Application and Developer ID Installer certificates."
               exit 1
             fi
 
             codesign --force --timestamp --options runtime \
-              --sign "$SIGNING_IDENTITY" "$APP_DIR"
+              --sign "$APP_SIGNING_IDENTITY" "$APP_DIR"
             codesign --verify --strict --verbose=2 "$APP_DIR"
 
-            NOTARIZATION_ARCHIVE="$RUNNER_TEMP/SNote-notarization.zip"
-            ditto -c -k --sequesterRsrc --keepParent "$APP_DIR" "$NOTARIZATION_ARCHIVE"
+            pkgbuild \
+              --component "$APP_DIR" \
+              --install-location /Applications \
+              --identifier "$BUNDLE_ID" \
+              --version "$VERSION" \
+              --sign "$INSTALLER_SIGNING_IDENTITY" \
+              "$PKG_PATH"
+
             xcrun notarytool store-credentials "SNote-notary" \
               --apple-id "$NOTARIZATION_APPLE_ID" \
               --password "$NOTARIZATION_PASSWORD" \
               --team-id "$NOTARIZATION_TEAM_ID"
-            xcrun notarytool submit "$NOTARIZATION_ARCHIVE" \
+            xcrun notarytool submit "$PKG_PATH" \
               --keychain-profile "SNote-notary" \
               --wait
-            xcrun stapler staple "$APP_DIR"
-            rm -f "$NOTARIZATION_ARCHIVE"
+            xcrun stapler staple "$PKG_PATH"
+            pkgutil --check-signature "$PKG_PATH"
           else
             codesign --force --sign - "$APP_DIR"
             codesign --verify --strict --verbose=2 "$APP_DIR"
-            echo "::warning::No Developer ID certificate was provided; this build is ad-hoc signed and will not be notarized."
+            pkgbuild \
+              --component "$APP_DIR" \
+              --install-location /Applications \
+              --identifier "$BUNDLE_ID" \
+              --version "$VERSION" \
+              "$PKG_PATH"
+            echo "::warning::No signing secrets were provided. This PKG is unsigned and is not notarized; macOS may block installation until the user explicitly allows it."
           fi
 
-          ditto -c -k --sequesterRsrc --keepParent "$APP_DIR" "dist/SNote-macOS.zip"
-          hdiutil create -volname "SNote" -srcfolder "$APP_DIR" \
-            -ov -format UDZO "dist/SNote-macOS.dmg"
+          test -s "$PKG_PATH"
 
-      - name: Upload build artifacts
+      - name: Upload build artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: SNote-macOS-arm64
-          path: |
-            dist/SNote-macOS.zip
-            dist/SNote-macOS.dmg
+          path: dist/SNote-macOS.pkg
           if-no-files-found: error
           retention-days: 14
 
       - name: Publish GitHub release
         env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.release.outputs.tag }}
+          GH_TOKEN: \${{ github.token }}
+          TAG: \${{ steps.release.outputs.tag }}
         shell: bash
         run: |
           set -euo pipefail
 
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            # Remove only the legacy assets generated by this workflow when replacing an existing release.
+            for legacy_asset in SNote-macOS.dmg SNote-macOS.zip; do
+              if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets \
+                --jq ".assets[].name" | grep -Fxq "$legacy_asset"; then
+                gh release delete-asset "$TAG" "$legacy_asset" \
+                  --repo "$GITHUB_REPOSITORY" \
+                  --yes
+              fi
+            done
+
             gh release upload "$TAG" \
               --repo "$GITHUB_REPOSITORY" \
               --clobber \
-              dist/SNote-macOS.zip \
-              dist/SNote-macOS.dmg
+              "$PKG_PATH"
           else
             gh release create "$TAG" \
               --repo "$GITHUB_REPOSITORY" \
               --title "SNote $TAG" \
-              --notes "Apple silicon (ARM64) macOS app built with SwiftUI and C++23. Download the ZIP or DMG." \
-              dist/SNote-macOS.zip \
-              dist/SNote-macOS.dmg
+              --notes "Apple silicon (ARM64) macOS installer package. Install SNote in /Applications." \
+              "$PKG_PATH"
           fi
